@@ -2,37 +2,39 @@ package main
 
 import (
 	"fmt"
-	"reflect"
-	"runtime"
-	"sync"
-	"time"
+	"net/http"
+
+	"github.com/MatyD356/vimGame/internals/handlers"
 )
 
-type Player struct {
-	X, Y int
+type Config struct {
+	Port   string
+	Env    *Env
+	Client *http.Client
 }
 
-func countFuncExecution(f func(), wg *sync.WaitGroup) {
-	defer wg.Done()
-	funcName := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
-	start := time.Now()
-	f()
-	elapsed := time.Since(start).Seconds()
-	fmt.Printf("Function '%s' executed in: %.3f seconds\n", funcName, elapsed)
-}
-
-func twoSeconds() {
-	time.Sleep(2123 * time.Millisecond)
-}
-
-func fiveSeconds() {
-	time.Sleep(5 * time.Second)
+type Env struct {
+	NotionSecret string
 }
 
 func main() {
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go countFuncExecution(twoSeconds, &wg)
-	go countFuncExecution(fiveSeconds, &wg)
-	wg.Wait()
+	// Env
+	cfg := &Config{
+		Env:    readEnv(),
+		Client: NewHttpClient(),
+		Port:   ":8080",
+	}
+	fmt.Println("Notion Secret:", cfg.Env.NotionSecret)
+
+	// Server
+	serverMux := http.NewServeMux()
+	serverMux.HandleFunc("/health", handlers.HandleHealt)
+
+	httpServer := http.Server{
+		Addr:    ":8080",
+		Handler: serverMux,
+	}
+
+	httpServer.ListenAndServe()
+
 }
