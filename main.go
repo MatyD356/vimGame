@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	env "github.com/MatyD356/vimGame/internals/env"
 	"github.com/MatyD356/vimGame/internals/handlers"
@@ -37,10 +38,16 @@ func main() {
 	serverMux.HandleFunc("/health", handlers.HandleHealt)
 
 	httpServer := http.Server{
-		Addr:    ":8080",
-		Handler: serverMux,
+		Addr:              ":8080",
+		Handler:           serverMux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	httpServer.ListenAndServe()
+	err = httpServer.ListenAndServe()
+
+	if err != nil {
+		fmt.Println("Error starting server:", err)
+		return
+	}
 
 }
