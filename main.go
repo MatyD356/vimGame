@@ -4,23 +4,29 @@ import (
 	"fmt"
 	"net/http"
 
+	env "github.com/MatyD356/vimGame/internals/env"
 	"github.com/MatyD356/vimGame/internals/handlers"
 )
 
 type Config struct {
 	Port   string
-	Env    *Env
+	Env    *env.Env
 	Client *http.Client
-}
-
-type Env struct {
-	NotionSecret string
 }
 
 func main() {
 	// Env
+	envCfg, err := env.ReadEnv()
+	if err != nil {
+		if err == env.ErrMissingNotionSecret {
+			fmt.Println("Error: NOTION_SECRET is not set in the environment")
+			return
+		}
+		fmt.Println("Error reading environment variables:", err)
+		return
+	}
 	cfg := &Config{
-		Env:    readEnv(),
+		Env:    envCfg,
 		Client: NewHttpClient(),
 		Port:   ":8080",
 	}
