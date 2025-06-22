@@ -5,8 +5,14 @@ import (
 	"time"
 )
 
-func NewHttpClient() *http.Client {
-	return &http.Client{
-		Timeout: 10 * time.Second,
+type Client struct {
+	httpClient http.Client
+}
+
+func NewClient(timeout, interval time.Duration) Client {
+	return Client{
+		httpClient: http.Client{
+			Timeout: timeout,
+		},
 	}
 }
