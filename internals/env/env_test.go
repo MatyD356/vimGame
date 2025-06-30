@@ -8,7 +8,7 @@ import (
 
 func TestReadEnv(t *testing.T) {
 	// Create a temporary .env file
-	envContent := "NOTION_SECRET=test123\n"
+	envContent := "NOTION_SECRET=test123\nNOTION_DB_ID=123\nPORT=8080\n"
 	err := os.WriteFile(".env", []byte(envContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write .env file: %v", err)
