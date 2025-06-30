@@ -1,7 +1,8 @@
-package main
+package notionservice
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,26 +12,23 @@ import (
 	"unicode"
 
 	"github.com/MatyD356/vimGame/internals/cache"
-	"github.com/MatyD356/vimGame/internals/notionApi"
+	"github.com/MatyD356/vimGame/internals/config"
+	"github.com/MatyD356/vimGame/internals/integrations/notion"
 )
 
 func parseNumber(s string) (int, error) {
-	// Trim spaces first
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, fmt.Errorf("empty string")
 	}
 
-	// Build a cleaned string keeping digits and one leading '-'
 	var builder strings.Builder
 	for i, r := range s {
 		if unicode.IsDigit(r) {
 			builder.WriteRune(r)
 		} else if r == '-' && i == 0 {
-			// keep leading minus
 			builder.WriteRune(r)
 		}
-		// ignore other chars like '+', '?', etc.
 	}
 
 	cleaned := builder.String()
@@ -46,46 +44,33 @@ func parseNumber(s string) (int, error) {
 	return num, nil
 }
 
-func (cfg *Config) GetDatabase(w http.ResponseWriter, r *http.Request) {
+func GetDatabase(cfg *config.Config) error {
 	fmt.Println("GetDatabase called")
-	notionDbId := r.PathValue("databaseId")
+	notionDbId := cfg.Env.NotionDbId
 	fmt.Println("Notion Database ID:", notionDbId)
 	if notionDbId == "" {
-		http.Error(w, "missing database ID", http.StatusBadRequest)
-		return
+		return errors.New("missing database ID")
 	}
-	url := notionApi.BaseURL + "databases/" + notionDbId + "/query"
-	req, err := http.NewRequest("POST", url, nil)
+	req, err := notion.GetDatabaseReq(notionDbId, cfg)
 	if err != nil {
-		http.Error(w, "failed to create request: "+err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+cfg.Env.NotionSecret)
-	req.Header.Set("Notion-Version", "2022-06-28")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Access-Control-Allow-Origin", "*")
-	fmt.Println("Request URL:", req.URL.String())
-	resp, err := cfg.NotionApi.httpClient.Do(req)
-
+	resp, err := cfg.HttpClient.Do(req)
 	if err != nil {
-		http.Error(w, "failed to make request: "+err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 	dat, err := io.ReadAll(resp.Body)
 	if err != nil {
-		http.Error(w, "failed to read response body: "+err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		http.Error(w, fmt.Sprintf("unexpected status code: %d, response: %s", resp.StatusCode, string(dat)), resp.StatusCode)
-		return
+		return errors.New("unexpected status code: " + strconv.Itoa(resp.StatusCode) + ", response: " + string(dat))
 	}
-	var database NotionDatabase
+	var database notion.Database
 	err = json.Unmarshal(dat, &database)
 	if err != nil {
-		http.Error(w, "failed to unmarshal response: "+err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	// Get sub-database IDs from the results
 	var pages []cache.PageCache
@@ -95,7 +80,7 @@ func (cfg *Config) GetDatabase(w http.ResponseWriter, r *http.Request) {
 			cachePage, ok := cfg.Cache.GetPage(result.ID)
 			if !ok {
 				fmt.Println("Cache miss for page ID:", result.ID)
-				cachePage, err = cfg.GetPageChildrenDatabaseId(result.ID, result.Properties.Name.Title[0].PlainText)
+				cachePage, err = GetPageChildrenDatabaseId(result.ID, result.Properties.Name.Title[0].PlainText, cfg)
 				cfg.Cache.SetPage(result.ID, cachePage)
 				if err != nil {
 					fmt.Println("Error getting page children database ID:", err)
@@ -121,38 +106,29 @@ func (cfg *Config) GetDatabase(w http.ResponseWriter, r *http.Request) {
 		if page.ChildDatabaseId == "" {
 			continue // skip empty IDs
 		}
-		subDbUrl := notionApi.BaseURL + "databases/" + page.ChildDatabaseId + "/query"
-		subReq, err := http.NewRequest("POST", subDbUrl, nil)
+		subDbUrl := notion.BaseURL + "databases/" + page.ChildDatabaseId + "/query"
+		subReq, err := notion.GetDatabaseReq(subDbUrl, cfg)
 		if err != nil {
-			http.Error(w, "failed to create sub-database request: "+err.Error(), http.StatusInternalServerError)
-			return
+			return err
 		}
-		subReq.Header.Set("Authorization", "Bearer "+cfg.Env.NotionSecret)
-		subReq.Header.Set("Notion-Version", "2022-06-28")
-		subReq.Header.Set("Content-Type", "application/json")
-		subResp, err := cfg.NotionApi.httpClient.Do(subReq)
+		subResp, err := cfg.HttpClient.Do(subReq)
 		fmt.Println("Request URL:", req.URL.String())
 
 		if err != nil {
-			http.Error(w, "failed to make sub-database request: "+err.Error(), http.StatusInternalServerError)
-			return
+			return err
 		}
 		defer subResp.Body.Close()
 		if subResp.StatusCode != http.StatusOK {
-			subDat, _ := io.ReadAll(subResp.Body)
-			http.Error(w, fmt.Sprintf("unexpected status code for sub-database: %d, response: %s", subResp.StatusCode, string(subDat)), subResp.StatusCode)
-			return
+			return errors.New("unexpected status code for sub-database:" + page.ChildDatabaseId)
 		}
-		var subDatabase NotionDatabase
+		var subDatabase notion.Database
 		subDat, err := io.ReadAll(subResp.Body)
 		if err != nil {
-			http.Error(w, "failed to read sub-database response body: "+err.Error(), http.StatusInternalServerError)
-			return
+			return err
 		}
 		err = json.Unmarshal(subDat, &subDatabase)
 		if err != nil {
-			fmt.Println("Error unmarshalling sub-database response:", err)
-			return
+			return err
 		}
 		for _, subResult := range subDatabase.Results {
 			if subResult.Object == "page" {
@@ -181,14 +157,6 @@ func (cfg *Config) GetDatabase(w http.ResponseWriter, r *http.Request) {
 				cfg.Cache.SetParsedChildDatabase(page.ChildDatabaseId, pages[idx].ChildDatabase)
 			}
 		}
-
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-	if err := json.NewEncoder(w).Encode(pages); err != nil {
-		http.Error(w, "failed to encode response: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	return nil
 }

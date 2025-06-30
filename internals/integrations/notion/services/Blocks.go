@@ -1,4 +1,4 @@
-package main
+package notionservice
 
 import (
 	"encoding/json"
@@ -6,15 +6,16 @@ import (
 	"net/http"
 
 	"github.com/MatyD356/vimGame/internals/cache"
-	"github.com/MatyD356/vimGame/internals/notionApi"
+	"github.com/MatyD356/vimGame/internals/config"
+	"github.com/MatyD356/vimGame/internals/integrations/notion"
 )
 
-func (cfg *Config) GetPageChildrenDatabaseId(pageId string, pageTitle string) (cache.PageCache, error) {
+func GetPageChildrenDatabaseId(pageId string, pageTitle string, cfg *config.Config) (cache.PageCache, error) {
 	fmt.Println("GetPageBlocks page ID:", pageId)
 	if pageId == "" {
 		return cache.PageCache{}, fmt.Errorf("missing page ID")
 	}
-	url := notionApi.BaseURL + "blocks/" + pageId + "/children"
+	url := notion.BaseURL + "blocks/" + pageId + "/children"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return cache.PageCache{}, err
@@ -23,7 +24,7 @@ func (cfg *Config) GetPageChildrenDatabaseId(pageId string, pageTitle string) (c
 	req.Header.Set("Notion-Version", "2022-06-28")
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := cfg.NotionApi.httpClient.Do(req)
+	resp, err := cfg.HttpClient.Do(req)
 	fmt.Println("Request URL:", req.URL.String())
 	if err != nil {
 		return cache.PageCache{}, fmt.Errorf("failed to make request: %w", err)
@@ -32,7 +33,7 @@ func (cfg *Config) GetPageChildrenDatabaseId(pageId string, pageTitle string) (c
 	if resp.StatusCode != http.StatusOK {
 		return cache.PageCache{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
-	var blocks NotionBlock
+	var blocks notion.Block
 	if err := json.NewDecoder(resp.Body).Decode(&blocks); err != nil {
 		return cache.PageCache{}, fmt.Errorf("failed to decode response: %w", err)
 	}

@@ -1,4 +1,4 @@
-package main
+package notion
 
 import "time"
 
@@ -9,11 +9,11 @@ type DatabaseProperty struct {
 		Type      string `json:"type"`
 		PlainText string `json:"plain_text"`
 	} `json:"title"`
-	RichText  []NotionRichText `json:"rich_text"`
-	PlainText string           `json:"plain_text"`
+	RichText  []RichText `json:"rich_text"`
+	PlainText string     `json:"plain_text"`
 }
 
-type NotionRichText struct {
+type RichText struct {
 	Type string `json:"type"`
 	Text struct {
 		Content string `json:"content"`
@@ -22,12 +22,12 @@ type NotionRichText struct {
 	PlainText string `json:"plain_text"`
 }
 
-type NotionEditEvent struct {
+type EditEvent struct {
 	Object string `json:"object"`
 	ID     string `json:"id"`
 }
 
-type NotionResult struct {
+type Result struct {
 	Object      string    `json:"object"`
 	ID          string    `json:"id"`
 	CreatedTime time.Time `json:"created_time"`
@@ -42,7 +42,7 @@ type NotionResult struct {
 	} `json:"properties"`
 }
 
-type NotionDatabase struct {
-	Object  string         `json:"object"`
-	Results []NotionResult `json:"results"`
+type Database struct {
+	Object  string   `json:"object"`
+	Results []Result `json:"results"`
 }

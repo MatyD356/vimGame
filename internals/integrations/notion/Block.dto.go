@@ -1,8 +1,8 @@
-package main
+package notion
 
 import "time"
 
-type NotionBlock struct {
+type Block struct {
 	Object  string `json:"object"`
 	Results []struct {
 		Object      string    `json:"object"`
