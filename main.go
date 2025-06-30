@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -10,16 +9,8 @@ import (
 	"github.com/MatyD356/vimGame/internals/config"
 	"github.com/MatyD356/vimGame/internals/env"
 	"github.com/MatyD356/vimGame/internals/handlers"
+	"github.com/MatyD356/vimGame/internals/middleware"
 )
-
-func dependencyInjectionMiddleware(next http.Handler, cfg *config.Config) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		ctx = context.WithValue(ctx, "config", cfg)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-
-}
 
 func main() {
 	envCfg, err := env.ReadEnv()
@@ -39,8 +30,8 @@ func main() {
 	serverMux.HandleFunc("/health", handlers.HandleHealt)
 	serverMux.HandleFunc("/training", handlers.HandleGetTraining)
 
-	corsWrappedMux := corsMiddleware(serverMux)
-	depedencyWrappedMux := dependencyInjectionMiddleware(corsWrappedMux, cfg)
+	corsWrappedMux := middleware.Cors(serverMux)
+	depedencyWrappedMux := middleware.DependencyInjection(corsWrappedMux, cfg)
 	httpServer := http.Server{
 		Addr:              ":" + cfg.Env.Port,
 		Handler:           depedencyWrappedMux,

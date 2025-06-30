@@ -8,10 +8,7 @@ import (
 )
 
 func ReadEnv() (*Env, error) {
-	err := godotenv.Load(".env")
-	if err != nil {
-		return nil, err
-	}
+	_ = godotenv.Load()
 
 	secret := os.Getenv("NOTION_SECRET")
 	if secret == "" {
