@@ -1,7 +1,6 @@
 package env
 
 import (
-	"errors"
 	"os"
 	"testing"
 )
@@ -35,7 +34,8 @@ func TestReadEnv_MissingSecret(t *testing.T) {
 	defer os.Remove(".env")
 
 	_, err = ReadEnv()
-	if err != errors.New("NOTION_SECRET is not set in the environment") {
-		t.Errorf("Expected ErrMissingNotionSecret, got %v", err)
+	expectedErr := "NOTION_SECRET is not set in the environment"
+	if err == nil || err.Error() != expectedErr {
+		t.Errorf("Expected %s, got %v", expectedErr, err)
 	}
 }
