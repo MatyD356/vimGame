@@ -12,5 +12,9 @@ func HandleGetTraining(w http.ResponseWriter, r *http.Request) {
 	cfg := ctx.Value("config").(*config.Config) // Type assertion
 	go notionservice.GetDatabase(cfg)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Training data is being fetched in the background. Please check back later."))
+	_, err := w.Write([]byte("Training data is being fetched in the background. Please check back later."))
+	if err != nil {
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		return
+	}
 }
